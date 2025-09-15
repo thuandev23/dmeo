@@ -39,27 +39,6 @@ class LocationCubit extends Cubit<LocationState> {
     emit(state.copyWith(loading: true, error: null));
 
     try {
-      // Kiểm tra permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          emit(state.copyWith(
-            loading: false,
-            error: 'Quyền truy cập vị trí bị từ chối',
-          ));
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        emit(state.copyWith(
-          loading: false,
-          error: 'Quyền truy cập vị trí bị từ chối vĩnh viễn',
-        ));
-        return;
-      }
-
       // Lấy vị trí hiện tại
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
