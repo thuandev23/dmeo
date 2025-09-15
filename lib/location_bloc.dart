@@ -72,4 +72,12 @@ class LocationCubit extends Cubit<LocationState> {
       ));
     }
   }
+
+  void setError(String error) {
+    emit(state.copyWith(loading: false, error: error));
+  }
+
+  void setLoading(bool loading) {
+    emit(state.copyWith(loading: loading));
+  }
 }

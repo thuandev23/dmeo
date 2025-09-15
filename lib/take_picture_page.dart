@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'dart:async';
+import 'package:demo_screenshot/library_picture_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -8,21 +9,22 @@ import 'package:camera/camera.dart';
 import 'package:gal/gal.dart';
 import 'location_bloc.dart';
 
-class CombinedPage extends StatefulWidget {
+class TakePicturepage extends StatefulWidget {
   final List<CameraDescription> cameras;
 
-  const CombinedPage({Key? key, required this.cameras}) : super(key: key);
+  const TakePicturepage({Key? key, required this.cameras}) : super(key: key);
 
   @override
-  _CombinedPageState createState() => _CombinedPageState();
+  _TakePicturepageState createState() => _TakePicturepageState();
 }
 
-class _CombinedPageState extends State<CombinedPage> {
+class _TakePicturepageState extends State<TakePicturepage> {
   CameraController? _cameraController;
   bool _isInitialized = false;
   final GlobalKey _repaintBoundaryKey = GlobalKey();
   String _currentTime = '';
   Timer? _timer;
+  bool _showFlashEffect = false;
 
   @override
   void initState() {
@@ -68,6 +70,17 @@ class _CombinedPageState extends State<CombinedPage> {
   }
 
   Future<void> _captureScreenshot() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      print('Camera chưa được khởi tạo.');
+      return;
+    }
+
+    setState(() {
+      _showFlashEffect = true;
+    });
+
+    await Future.delayed(Duration(milliseconds: 50));
+
     try {
       RenderRepaintBoundary boundary =
           _repaintBoundaryKey.currentContext!.findRenderObject()
@@ -84,23 +97,33 @@ class _CombinedPageState extends State<CombinedPage> {
         final imageBytes = byteData.buffer.asUint8List();
 
         try {
-          // Lưu vào thư viện ảnh với package gal
           await Gal.putImageBytes(imageBytes);
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Đã lưu ảnh Camera + Tọa độ vào thư viện!')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Đã lưu ảnh Camera + Tọa độ vào thư viện!'),
+              ),
+            );
+          }
         } catch (e) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Lỗi khi lưu ảnh: $e')));
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Lỗi khi lưu ảnh: $e')));
+          }
         }
       }
     } catch (e) {
       print('Lỗi khi chụp screenshot: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Lỗi khi chụp screenshot: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi khi chụp screenshot: $e')));
+      }
+    } finally {
+      setState(() {
+        _showFlashEffect = false;
+      });
     }
   }
 
@@ -120,20 +143,29 @@ class _CombinedPageState extends State<CombinedPage> {
       ),
       body: Column(
         children: [
-          Stack(
-            children: [
-              RepaintBoundary(
-                key: _repaintBoundaryKey,
-                child: Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: MediaQuery.of(context).size.height * 0.7,
+          Expanded(
+            child: Stack(
+              children: [
+                RepaintBoundary(
+                  key: _repaintBoundaryKey,
                   child: Stack(
                     children: [
                       // Camera preview hoặc loading
                       if (_isInitialized)
-                        CameraPreview(_cameraController!)
+                        SizedBox(
+                          width: double.infinity,
+                          height: MediaQuery.of(context).size.height * 0.6,
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            child: SizedBox(
+                              width:
+                                  _cameraController!.value.previewSize!.height,
+                              height:
+                                  _cameraController!.value.previewSize!.width,
+                              child: CameraPreview(_cameraController!),
+                            ),
+                          ),
+                        )
                       else
                         Container(
                           color: Colors.black,
@@ -151,7 +183,6 @@ class _CombinedPageState extends State<CombinedPage> {
                             ),
                           ),
                         ),
-                      // Overlay thông tin tọa độ
                       Positioned(
                         top: 20,
                         left: 20,
@@ -161,7 +192,7 @@ class _CombinedPageState extends State<CombinedPage> {
                             return Container(
                               padding: EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
+                                color: Colors.black.withOpacity(0.5),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Column(
@@ -183,16 +214,6 @@ class _CombinedPageState extends State<CombinedPage> {
                                           fontSize: 14,
                                         ),
                                       ),
-                                      Spacer(),
-                                      if (state.loading)
-                                        SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
                                     ],
                                   ),
                                   SizedBox(width: 10),
@@ -205,6 +226,15 @@ class _CombinedPageState extends State<CombinedPage> {
                                     ),
                                   ),
                                   SizedBox(height: 8),
+                                  if (state.loading)
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
                                   if (!state.loading &&
                                       state.position != null) ...[
                                     Text(
@@ -253,23 +283,31 @@ class _CombinedPageState extends State<CombinedPage> {
                     ],
                   ),
                 ),
-              ),
-            ],
+                if (_showFlashEffect)
+                  Positioned.fill(child: Container(color: Colors.white)),
+              ],
+            ),
           ),
-          SizedBox(height: 20),
+          SizedBox(height: 100),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Nút refresh location
               FloatingActionButton(
-                heroTag: "refresh",
+                heroTag: "library",
                 onPressed: () {
-                  context.read<LocationCubit>().fetchLocation();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LibraryPicturePage(),
+                    ),
+                  );
                 },
                 backgroundColor: Colors.blue,
-                child: Icon(Icons.refresh, color: Colors.white),
+                child: Icon(
+                  Icons.library_add_check_outlined,
+                  color: Colors.white,
+                ),
               ),
-              // Nút chụp screenshot
               FloatingActionButton(
                 heroTag: "capture",
                 onPressed: _captureScreenshot,
@@ -278,6 +316,7 @@ class _CombinedPageState extends State<CombinedPage> {
               ),
             ],
           ),
+          SizedBox(height: 20),
         ],
       ),
     );
