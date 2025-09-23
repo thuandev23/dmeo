@@ -55,7 +55,7 @@ class _CameraScreenState extends State<CameraScreen>
         _isCameraPermissionGranted = true;
       });
       // Set and initialize the new camera
-      onNewCameraSelected(cameras[0]);
+      //onNewCameraSelected(cameras[0]);
       refreshAlreadyCapturedImages();
     } else {
       log('Camera Permission: DENIED');
@@ -479,10 +479,10 @@ class _CameraScreenState extends State<CameraScreen>
                                                 setState(() {
                                                   _isCameraInitialized = false;
                                                 });
-                                                onNewCameraSelected(cameras[
-                                                    _isRearCameraSelected
-                                                        ? 1
-                                                        : 0]);
+                                                // onNewCameraSelected(cameras[
+                                                //     _isRearCameraSelected
+                                                //         ? 1
+                                                //         : 0]);
                                                 setState(() {
                                                   _isRearCameraSelected =
                                                       !_isRearCameraSelected;

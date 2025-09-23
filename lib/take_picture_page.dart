@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:camera/camera.dart';
 import 'package:gal/gal.dart';
+import 'package:geocoding/geocoding.dart';
 import 'location_bloc.dart';
 
 class TakePicturepage extends StatefulWidget {
@@ -24,7 +25,12 @@ class _TakePicturepageState extends State<TakePicturepage> {
   final GlobalKey _repaintBoundaryKey = GlobalKey();
   String _currentTime = '';
   Timer? _timer;
-  bool _showFlashEffect = false;
+  String? address;
+  double latitude = 0.0;
+  double longitude = 0.0;
+  double _currentZoomLevel = 1.0;
+  double _minAvailableZoom = 1.0;
+  double _maxAvailableZoom = 1.0;
 
   @override
   void initState() {
@@ -35,23 +41,50 @@ class _TakePicturepageState extends State<TakePicturepage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<LocationCubit>().fetchLocation();
     });
+    Future.delayed(Duration(seconds: 2), _fetchLocation);
   }
 
   Future<void> _initializeCamera() async {
     if (widget.cameras.isNotEmpty) {
       _cameraController = CameraController(
         widget.cameras[0],
-        ResolutionPreset.high,
+        ResolutionPreset.ultraHigh,
       );
 
       try {
         await _cameraController!.initialize();
+
+        // Initialize zoom levels
+        _minAvailableZoom = await _cameraController!.getMinZoomLevel();
+        _maxAvailableZoom = await _cameraController!.getMaxZoomLevel();
+        _currentZoomLevel = _minAvailableZoom;
+
         setState(() {
           _isInitialized = true;
         });
       } catch (e) {
         print('Lỗi khởi tạo camera: $e');
       }
+    }
+  }
+
+  Future<void> _fetchLocation() async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        latitude,
+        longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        address =
+            '${place.street}, '
+            '${place.subAdministrativeArea}, '
+            '${place.administrativeArea}, '
+            '${place.country}';
+      }
+    } catch (e) {
+      address = 'Không thể lấy địa chỉ';
     }
   }
 
@@ -74,11 +107,6 @@ class _TakePicturepageState extends State<TakePicturepage> {
       print('Camera chưa được khởi tạo.');
       return;
     }
-
-    setState(() {
-      _showFlashEffect = true;
-    });
-
     await Future.delayed(Duration(milliseconds: 50));
 
     try {
@@ -98,13 +126,6 @@ class _TakePicturepageState extends State<TakePicturepage> {
 
         try {
           await Gal.putImageBytes(imageBytes);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Đã lưu ảnh Camera + Tọa độ vào thư viện!'),
-              ),
-            );
-          }
         } catch (e) {
           if (mounted) {
             ScaffoldMessenger.of(
@@ -120,10 +141,6 @@ class _TakePicturepageState extends State<TakePicturepage> {
           context,
         ).showSnackBar(SnackBar(content: Text('Lỗi khi chụp screenshot: $e')));
       }
-    } finally {
-      setState(() {
-        _showFlashEffect = false;
-      });
     }
   }
 
@@ -150,11 +167,10 @@ class _TakePicturepageState extends State<TakePicturepage> {
                   key: _repaintBoundaryKey,
                   child: Stack(
                     children: [
-                      // Camera preview hoặc loading
                       if (_isInitialized)
                         SizedBox(
                           width: double.infinity,
-                          height: MediaQuery.of(context).size.height * 0.6,
+                          height: MediaQuery.of(context).size.height * 0.7,
                           child: FittedBox(
                             fit: BoxFit.cover,
                             child: SizedBox(
@@ -189,6 +205,8 @@ class _TakePicturepageState extends State<TakePicturepage> {
                         right: 20,
                         child: BlocBuilder<LocationCubit, LocationState>(
                           builder: (context, state) {
+                            latitude = state.position?.latitude ?? 0.0;
+                            longitude = state.position?.longitude ?? 0.0;
                             return Container(
                               padding: EdgeInsets.all(16),
                               decoration: BoxDecoration(
@@ -253,18 +271,6 @@ class _TakePicturepageState extends State<TakePicturepage> {
                                         fontFamily: 'monospace',
                                       ),
                                     ),
-                                    if (state.address != null) ...[
-                                      SizedBox(height: 4),
-                                      Text(
-                                        state.address!,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
                                   ],
                                   if (state.error != null)
                                     Text(
@@ -274,6 +280,40 @@ class _TakePicturepageState extends State<TakePicturepage> {
                                         fontSize: 12,
                                       ),
                                     ),
+                                  if (address == null) ...[
+                                    SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Đang lấy địa chỉ...',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ] else ...[
+                                    SizedBox(height: 4),
+                                    Text(
+                                      address!,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 5,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ],
                               ),
                             );
@@ -283,12 +323,56 @@ class _TakePicturepageState extends State<TakePicturepage> {
                     ],
                   ),
                 ),
-                if (_showFlashEffect)
-                  Positioned.fill(child: Container(color: Colors.white)),
               ],
             ),
           ),
           SizedBox(height: 100),
+          // Zoom controls
+          if (_isInitialized) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: _currentZoomLevel,
+                    min: _minAvailableZoom,
+                    max: _maxAvailableZoom,
+                    activeColor: Colors.black,
+                    inactiveColor: Colors.grey,
+                    onChanged: (value) async {
+                      setState(() {
+                        _currentZoomLevel = value;
+                      });
+                      await _cameraController!.setZoomLevel(value);
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0, right: 16.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey,
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 4.0,
+                      ),
+                      child: Text(
+                        '${_currentZoomLevel.toStringAsFixed(1)}x',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [

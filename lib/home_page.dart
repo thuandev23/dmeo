@@ -288,34 +288,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
 
-                if (state.position != null)
-                  Container(
-                    margin: EdgeInsets.all(16),
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      border: Border.all(color: Colors.green),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(Icons.location_on, color: Colors.green),
-                        SizedBox(height: 8),
-                        Text('Vị trí hiện tại:'),
-                        Text(
-                          '${state.position!.latitude.toStringAsFixed(6)}, ${state.position!.longitude.toStringAsFixed(6)}',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        if (state.address != null) ...[
-                          SizedBox(height: 4),
-                          Text(state.address!),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                SizedBox(height: 32),
-
                 ElevatedButton.icon(
                   onPressed:
                       cameraList != null && cameraList!.isNotEmpty
@@ -326,7 +298,9 @@ class _HomePageState extends State<HomePage> {
                                 builder:
                                     (context) => BlocProvider.value(
                                       value: locationCubit,
-                                      child: TakePicturepage(cameras: cameraList!),
+                                      child: TakePicturepage(
+                                        cameras: cameraList!,
+                                      ),
                                     ),
                               ),
                             );
